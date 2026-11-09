@@ -20,6 +20,32 @@ import { LiveClock } from "@/components/shared/LiveClock";
 import { CURATED_COLLECTIONS } from "@/data/initialProducts";
 
 export function Footer() {
+  const [settings, setSettings] = React.useState<any>({
+    phone: "+1 (800) 555-PLANT (7526)",
+    storeEmail: "care@bloomingoasis.demo",
+    address: "742 Botanical Way, Suite 4B, Verdant Green District, CA 94107",
+    socialLinks: {
+      instagram: "https://instagram.com",
+      pinterest: "https://pinterest.com",
+      facebook: "https://facebook.com",
+      tiktok: "https://tiktok.com",
+    },
+  });
+
+  React.useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        if (json.success && json.settings) {
+          setSettings(json.settings);
+        }
+      } catch (err) {
+        console.warn("Could not load footer settings:", err);
+      }
+    }
+    loadSettings();
+  }, []);
   return (
     <footer className="bg-forest text-offwhite border-t border-forest-light/40">
       {/* Top Banner with Guarantee and Live Greenhouse Clock */}
@@ -59,7 +85,7 @@ export function Footer() {
               </span>
               <div className="flex items-center gap-3">
                 <a
-                  href="https://instagram.com"
+                  href={settings.socialLinks?.instagram || "https://instagram.com"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-forest-light hover:bg-botanical text-cream hover:text-offwhite flex items-center justify-center transition-colors border border-sage/20"
@@ -68,7 +94,7 @@ export function Footer() {
                   <InstagramIcon className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://pinterest.com"
+                  href={settings.socialLinks?.pinterest || "https://pinterest.com"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-forest-light hover:bg-botanical text-cream hover:text-offwhite flex items-center justify-center transition-colors border border-sage/20"
@@ -77,7 +103,7 @@ export function Footer() {
                   <PinterestIcon className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://facebook.com"
+                  href={settings.socialLinks?.facebook || "https://facebook.com"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-forest-light hover:bg-botanical text-cream hover:text-offwhite flex items-center justify-center transition-colors border border-sage/20"
@@ -86,7 +112,7 @@ export function Footer() {
                   <FacebookIcon className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://tiktok.com"
+                  href={settings.socialLinks?.tiktok || "https://tiktok.com"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-forest-light hover:bg-botanical text-cream hover:text-offwhite flex items-center justify-center transition-colors border border-sage/20"
@@ -177,19 +203,17 @@ export function Footer() {
             <div className="space-y-2.5 text-xs text-cream/75">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-sage flex-shrink-0 mt-0.5" />
-                <span>
-                  742 Botanical Way, Suite 4B
-                  <br />
-                  Verdant Green District, CA 94107
+                <span className="whitespace-pre-line">
+                  {settings.address}
                 </span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-sage flex-shrink-0" />
-                <span>care@bloomingoasis.demo</span>
+                <span>{settings.storeEmail}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-sage flex-shrink-0" />
-                <span>+1 (800) 555-PLANT (7526)</span>
+                <span>{settings.phone}</span>
               </div>
               <p className="text-[11px] text-sage/70 pt-1">
                 Demonstration nursery info for Freelancing Level 3 Web Development Assessment.

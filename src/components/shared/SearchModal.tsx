@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, X, ArrowRight, Sparkles } from "lucide-react";
-import { INITIAL_PRODUCTS, ProductData } from "@/data/initialProducts";
+import { Search, X, ArrowRight } from "lucide-react";
+import { ProductData } from "@/data/initialProducts";
 import { formatPrice } from "@/lib/browser-interactions";
 
 interface SearchModalProps {
@@ -15,24 +15,35 @@ interface SearchModalProps {
 export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductData[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults(INITIAL_PRODUCTS.slice(0, 4));
-      return;
-    }
+    if (!isOpen) return;
 
-    const q = query.toLowerCase().trim();
-    const matched = INITIAL_PRODUCTS.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.botanicalName.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q))
-    );
-    setResults(matched);
-  }, [query]);
+    let isMounted = true;
+    const delayDebounce = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const url = query.trim()
+          ? `/api/products?search=${encodeURIComponent(query.trim())}`
+          : `/api/products`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (isMounted && json.success && Array.isArray(json.data)) {
+          setResults(query.trim() ? json.data : json.data.slice(0, 4));
+        }
+      } catch (err) {
+        console.warn("Search query failed:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(delayDebounce);
+    };
+  }, [query, isOpen]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -87,7 +98,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
         {/* Quick category filter tags */}
         <div className="px-5 py-2.5 bg-offwhite/50 border-b border-sage/20 flex items-center gap-2 overflow-x-auto text-xs text-charcoal/70">
           <span className="font-medium text-forest">Popular:</span>
-          {["Monstera", "Snake Plant", "Low Light", "Pet Friendly", "Trees"].map(
+          {["Monstera", "Snake Plant", "Low light", "Pet Friendly", "Trees"].map(
             (tag) => (
               <button
                 key={tag}
@@ -100,70 +111,86 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           )}
         </div>
 
-        {/* Search Results */}
-        <div className="max-h-[60vh] overflow-y-auto p-4 sm:p-5 divide-y divide-sage/20">
-          <div className="text-xs font-semibold uppercase tracking-wider text-botanical mb-3 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            {query.trim() ? `Search Results (${results.length})` : "Curated Recommendations"}
-          </div>
-
-          {results.length === 0 ? (
+        {/* Results List */}
+        <div className="max-h-[60vh] overflow-y-auto p-4 divide-y divide-sage/20">
+          {loading ? (
+            <div className="py-8 text-center text-xs text-charcoal/60">
+              Searching greenhouse catalog...
+            </div>
+          ) : results.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="font-serif text-lg text-forest mb-1">
-                No plants found matching &ldquo;{query}&rdquo;
+              <p className="text-sm font-serif font-bold text-forest mb-1">
+                No matching plants found
               </p>
-              <p className="text-xs text-charcoal/70 max-w-sm mx-auto mb-4">
-                Try searching for broader terms like &ldquo;Tropical&rdquo;, &ldquo;Low light&rdquo;, or &ldquo;Ferns&rdquo;.
+              <p className="text-xs text-charcoal/60">
+                Try searching for general keywords like &ldquo;Tropical&rdquo;, &ldquo;Pothos&rdquo;, or &ldquo;Fern&rdquo;.
               </p>
             </div>
           ) : (
-            results.map((product) => (
-              <Link
-                key={product.slug}
-                href={`/products/${product.slug}`}
-                onClick={onClose}
-                className="group flex items-center gap-4 py-3 hover:bg-cream/60 rounded-xl px-2 transition-colors"
-              >
-                <div className="relative w-14 h-16 rounded-lg overflow-hidden bg-cream flex-shrink-0 border border-sage/20">
-                  <Image
-                    src={product.images[0]}
-                    alt={product.name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-serif font-semibold text-forest text-sm group-hover:text-botanical transition-colors truncate">
-                      {product.name}
-                    </h4>
-                    {product.petFriendly && (
-                      <span className="text-[10px] uppercase font-medium px-1.5 py-0.5 rounded bg-sage/30 text-forest flex-shrink-0">
-                        Pet Safe
-                      </span>
+            results.map((product) => {
+              const mainImg = product.images?.[0] || "";
+              return (
+                <Link
+                  key={product.slug}
+                  href={`/products/${product.slug}`}
+                  onClick={onClose}
+                  className="flex items-center gap-4 py-3 px-2 rounded-xl hover:bg-cream/70 transition-colors group"
+                >
+                  <div className="relative w-14 h-16 rounded-lg overflow-hidden bg-cream flex-shrink-0">
+                    {mainImg && (
+                      <Image
+                        src={mainImg}
+                        alt={product.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform"
+                      />
                     )}
                   </div>
-                  <p className="text-xs text-charcoal/60 truncate italic">
-                    {product.botanicalName}
-                  </p>
-                  <p className="text-xs text-charcoal/80 truncate mt-0.5">
-                    {product.tagline}
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="font-serif font-bold text-forest text-sm">
-                    {formatPrice(product.price)}
-                  </span>
-                  <div className="text-[11px] text-botanical flex items-center justify-end gap-1 group-hover:translate-x-0.5 transition-transform">
-                    View <ArrowRight className="w-2.5 h-2.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-forest group-hover:text-botanical transition-colors truncate">
+                        {product.name}
+                      </h4>
+                      <span className="text-xs font-mono font-bold text-forest ml-2">
+                        {formatPrice(product.price)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-charcoal/60 italic truncate">
+                      {product.botanicalName}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-charcoal/70">
+                      <span className="px-2 py-0.5 rounded-full bg-cream border border-sage/30">
+                        {product.category}
+                      </span>
+                      <span>•</span>
+                      <span>{product.sunlight}</span>
+                      {product.petFriendly && (
+                        <>
+                          <span>•</span>
+                          <span className="text-botanical font-medium">Pet Safe</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))
+                  <ArrowRight className="w-4 h-4 text-sage opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                </Link>
+              );
+            })
           )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-3 bg-cream/50 border-t border-sage/20 flex items-center justify-between text-xs text-charcoal/60 px-5">
+          <span>Press ESC or click outside to dismiss</span>
+          <Link
+            href="/products"
+            onClick={onClose}
+            className="text-botanical hover:text-forest font-medium uppercase tracking-wider"
+          >
+            View all plants →
+          </Link>
         </div>
       </div>
     </div>
   );
 }
-

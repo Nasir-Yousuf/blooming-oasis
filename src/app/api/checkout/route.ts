@@ -4,8 +4,9 @@ import { Order, OrderStatus } from "@/models/Order";
 import { Product } from "@/models/Product";
 import { Coupon } from "@/models/Coupon";
 import { InventoryLog } from "@/models/InventoryLog";
+import { StoreSettings } from "@/models/StoreSettings";
 import { getUserFromRequest } from "@/lib/auth";
-import { INITIAL_PRODUCTS } from "@/data/initialProducts";
+import { revalidateStoreCatalog } from "@/lib/data-access";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     if (!customer?.name || !customer?.email || !customer?.phone) {
       return NextResponse.json(
-        { success: false, message: "Please provide complete customer details" },
+        { success: false, message: "Please provide complete customer name, email, and phone" },
         { status: 400 }
       );
     }
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
       !shippingAddress?.postalCode
     ) {
       return NextResponse.json(
-        { success: false, message: "Please provide complete shipping address" },
+        { success: false, message: "Please provide a complete shipping address" },
         { status: 400 }
       );
     }
@@ -46,121 +47,188 @@ export async function POST(req: NextRequest) {
 
     const authUser = getUserFromRequest(req);
     const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable. Please try again." },
+        { status: 503 }
+      );
+    }
 
-    // 1. Calculate and re-verify pricing on server
+    // 1. Fetch live Store Settings for delivery charges
+    let storeSettings = await StoreSettings.findOne().lean();
+    if (!storeSettings) {
+      storeSettings = (await StoreSettings.create({})).toObject();
+    }
+    const deliveryChargeFee = typeof storeSettings.deliveryCharge === "number" ? storeSettings.deliveryCharge : 12;
+    const freeDeliveryThreshold = typeof storeSettings.freeDeliveryThreshold === "number" ? storeSettings.freeDeliveryThreshold : 75;
+
+    // 2. Validate and calculate item prices server-side from MongoDB
     let calculatedSubtotal = 0;
     const validatedItems = [];
 
     for (const item of items) {
-      let catalogPlant: any = null;
-      if (db) {
-        catalogPlant = await Product.findOne({ slug: item.product.slug });
-      }
-      if (!catalogPlant) {
-        catalogPlant = INITIAL_PRODUCTS.find((p) => p.slug === item.product.slug);
-      }
-
-      if (!catalogPlant) {
+      const slugOrId = item.product?.slug || item.product?._id || item.productId;
+      if (!slugOrId) {
         return NextResponse.json(
-          { success: false, message: `Plant not found: ${item.product.name}` },
+          { success: false, message: "Invalid product information in cart" },
           { status: 400 }
         );
       }
 
-      // Check stock
-      if (catalogPlant.stock < item.quantity) {
+      // Query database
+      const plant = await Product.findOne({
+        $or: [{ slug: slugOrId }, { _id: slugOrId.match(/^[0-9a-fA-F]{24}$/) ? slugOrId : null }],
+      });
+
+      if (!plant) {
+        return NextResponse.json(
+          { success: false, message: `Botanical product '${item.product?.name || slugOrId}' not found in catalog` },
+          { status: 400 }
+        );
+      }
+
+      if (!plant.published) {
+        return NextResponse.json(
+          { success: false, message: `Plant '${plant.name}' is currently unavailable for purchase` },
+          { status: 400 }
+        );
+      }
+
+      const requestedQty = Number(item.quantity) || 1;
+      if (plant.stock < requestedQty) {
         return NextResponse.json(
           {
             success: false,
-            message: `Insufficient stock for ${catalogPlant.name}. Only ${catalogPlant.stock} available.`,
+            message: `Insufficient stock for ${plant.name}. Only ${plant.stock} remaining in greenhouse.`,
           },
           { status: 400 }
         );
       }
 
-      const sizeOption = catalogPlant.sizes?.find(
-        (s: any) => s.name === item.size
-      );
-      const sizeModifier = sizeOption ? sizeOption.priceModifier : 0;
+      // Check size modifier
+      const chosenSize = plant.sizes?.find((s: any) => s.name === item.size);
+      const sizeModifier = chosenSize ? Number(chosenSize.priceModifier) || 0 : 0;
 
+      // Validate accessories against actual product accessory specs
       let accessoriesCost = 0;
       const validAccessories = [];
       if (item.accessories && Array.isArray(item.accessories)) {
         for (const acc of item.accessories) {
-          const matchAcc = catalogPlant.accessories?.find(
-            (a: any) => a.id === acc.id
-          );
+          const matchAcc = plant.accessories?.find((a: any) => a.id === acc.id);
           if (matchAcc) {
-            accessoriesCost += matchAcc.price;
+            accessoriesCost += Number(matchAcc.price) || 0;
             validAccessories.push({
               id: matchAcc.id,
               name: matchAcc.name,
-              price: matchAcc.price,
+              price: Number(matchAcc.price) || 0,
             });
           }
         }
       }
 
-      const unitPrice = catalogPlant.price + sizeModifier + accessoriesCost;
-      const totalPrice = unitPrice * item.quantity;
+      const unitPrice = plant.price + sizeModifier + accessoriesCost;
+      const totalPrice = unitPrice * requestedQty;
       calculatedSubtotal += totalPrice;
 
       validatedItems.push({
-        productId: catalogPlant._id ? String(catalogPlant._id) : catalogPlant.slug,
-        productSlug: catalogPlant.slug,
-        productName: catalogPlant.name,
-        productImage: catalogPlant.images?.[0] || "",
+        productId: String(plant._id),
+        productSlug: plant.slug,
+        productName: plant.name,
+        productImage: plant.images?.[0] || "",
         size: item.size || "Small",
         unitPrice,
-        quantity: item.quantity,
+        quantity: requestedQty,
         accessories: validAccessories,
         totalPrice,
       });
     }
 
-    // 2. Validate Coupon
+    // 3. Validate coupon code against MongoDB
     let discountAmount = 0;
     let validCouponCode = "";
 
     if (couponCode && typeof couponCode === "string") {
       const codeClean = couponCode.trim().toUpperCase();
-      if (db) {
-        const coupon = await Coupon.findOne({
-          code: codeClean,
-          active: true,
-          expiresAt: { $gte: new Date() },
-        });
+      const coupon = await Coupon.findOne({
+        code: codeClean,
+        active: true,
+        expiresAt: { $gte: new Date() },
+      });
 
-        if (coupon && calculatedSubtotal >= coupon.minOrderAmount) {
-          if (coupon.discountType === "percentage") {
-            discountAmount = (calculatedSubtotal * coupon.discountValue) / 100;
-            if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-              discountAmount = coupon.maxDiscount;
-            }
-          } else {
-            discountAmount = coupon.discountValue;
+      if (coupon) {
+        if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+          return NextResponse.json(
+            { success: false, message: "This coupon code has reached its maximum usage limit." },
+            { status: 400 }
+          );
+        }
+
+        if (calculatedSubtotal < coupon.minOrderAmount) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Coupon ${coupon.code} requires a minimum order subtotal of $${coupon.minOrderAmount}.`,
+            },
+            { status: 400 }
+          );
+        }
+
+        if (coupon.discountType === "percentage") {
+          discountAmount = (calculatedSubtotal * coupon.discountValue) / 100;
+          if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+            discountAmount = coupon.maxDiscount;
           }
-          validCouponCode = coupon.code;
-          coupon.usageCount += 1;
-          await coupon.save();
+        } else {
+          discountAmount = coupon.discountValue;
         }
-      } else {
-        // Dev fallback coupons
-        if (codeClean === "WELCOME10" && calculatedSubtotal >= 40) {
-          discountAmount = (calculatedSubtotal * 10) / 100;
-          validCouponCode = "WELCOME10";
-        } else if (codeClean === "BLOOM15" && calculatedSubtotal >= 75) {
-          discountAmount = (calculatedSubtotal * 15) / 100;
-          validCouponCode = "BLOOM15";
-        }
+
+        validCouponCode = coupon.code;
+        coupon.usageCount += 1;
+        await coupon.save();
       }
     }
 
-    // 3. Delivery charge (Free over $75)
-    const deliveryCharge = calculatedSubtotal >= 75 ? 0 : 12;
+    // 4. Calculate delivery fee and final total
+    const deliveryCharge = calculatedSubtotal >= freeDeliveryThreshold ? 0 : deliveryChargeFee;
     const finalTotal = Math.max(0, calculatedSubtotal - discountAmount + deliveryCharge);
 
-    // 4. Generate unique order number
+    // 5. Atomic Inventory Decrement with Concurrency Safety
+    // To prevent overselling under high concurrency, decrement each product conditionally
+    const decrementedList: Array<{ productId: string; quantity: number; prevStock: number; newStock: number; name: string }> = [];
+
+    for (const item of validatedItems) {
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: item.productId, stock: { $gte: item.quantity }, published: true },
+        { $inc: { stock: -item.quantity } },
+        { new: true }
+      );
+
+      if (!updatedProduct) {
+        // Roll back any previously decremented items
+        for (const rolledBack of decrementedList) {
+          await Product.findByIdAndUpdate(rolledBack.productId, {
+            $inc: { stock: rolledBack.quantity },
+          });
+        }
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Sorry, inventory for '${item.productName}' just changed. Please review your cart.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      decrementedList.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        prevStock: updatedProduct.stock + item.quantity,
+        newStock: updatedProduct.stock,
+        name: updatedProduct.name,
+      });
+    }
+
+    // 6. Generate unique order number
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
     const orderNumber = `BO-${randomSuffix}`;
 
@@ -199,45 +267,29 @@ export async function POST(req: NextRequest) {
       notes: notes || "",
     };
 
-    if (db) {
-      const createdOrder: any = await Order.create(orderData);
+    const createdOrder: any = await Order.create(orderData);
 
-      // Decrement inventory safely & record log
-      for (const itm of validatedItems) {
-        const plantDoc = await Product.findById(itm.productId);
-        if (plantDoc) {
-          const prev = plantDoc.stock;
-          plantDoc.stock = Math.max(0, plantDoc.stock - itm.quantity);
-          await plantDoc.save();
-
-          await InventoryLog.create({
-            productId: String(plantDoc._id),
-            productName: plantDoc.name,
-            previousStock: prev,
-            changeAmount: -itm.quantity,
-            newStock: plantDoc.stock,
-            reason: "Order Placement",
-            updatedBy: `Order #${orderNumber}`,
-          });
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        orderNumber,
-        orderId: createdOrder._id,
-        order: createdOrder,
-        message: "Order placed successfully!",
+    // 7. Record inventory logs
+    for (const dec of decrementedList) {
+      await InventoryLog.create({
+        productId: dec.productId,
+        productName: dec.name,
+        previousStock: dec.prevStock,
+        changeAmount: -dec.quantity,
+        newStock: dec.newStock,
+        reason: "Order Placement",
+        updatedBy: `Order #${orderNumber}`,
       });
     }
 
-    // Offline dev fallback
+    revalidateStoreCatalog();
+
     return NextResponse.json({
       success: true,
       orderNumber,
-      orderId: `local-${Date.now()}`,
-      order: orderData,
-      message: "Order placed successfully (Demonstration Mode)!",
+      orderId: createdOrder._id,
+      order: createdOrder,
+      message: "Order placed successfully!",
     });
   } catch (error) {
     console.error("Checkout API error:", error);

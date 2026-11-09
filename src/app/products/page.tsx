@@ -1,23 +1,63 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { INITIAL_PRODUCTS } from "@/data/initialProducts";
+import React, { useState, useEffect, useMemo } from "react";
+import { ProductData } from "@/data/initialProducts";
 import { PlantCard } from "@/components/shared/PlantCard";
 import { ProductFilterBar } from "@/components/products/ProductFilterBar";
 import { Sprout } from "lucide-react";
 
 export default function ProductsPage() {
+  const [products, setProducts] = useState<ProductData[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedDifficulty, setSelectedDifficulty] = useState("All");
   const [petFriendlyOnly, setPetFriendlyOnly] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
 
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [prodRes, catRes] = await Promise.all([
+          fetch("/api/products"),
+          fetch("/api/categories"),
+        ]);
+        const prodJson = await prodRes.json();
+        const catJson = await catRes.json();
+
+        if (prodJson.success && Array.isArray(prodJson.data)) {
+          setProducts(prodJson.data);
+        }
+
+        if (catJson.success && Array.isArray(catJson.categories)) {
+          const names = catJson.categories.map((c: any) => c.name);
+          setCategories(names);
+        }
+      } catch (err) {
+        console.error("Failed to load products/categories:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Compute available categories including any present on products
+  const allCategoryNames = useMemo(() => {
+    const fromCategories = categories;
+    const fromProducts = products.map((p) => p.category).filter(Boolean);
+    return Array.from(new Set([...fromCategories, ...fromProducts]));
+  }, [categories, products]);
+
   const filteredProducts = useMemo(() => {
-    let list = [...INITIAL_PRODUCTS];
+    let list = [...products];
 
     if (selectedCategory !== "All") {
-      list = list.filter((p) => p.category === selectedCategory);
+      list = list.filter(
+        (p) => p.category?.toLowerCase() === selectedCategory.toLowerCase()
+      );
     }
 
     if (selectedDifficulty !== "All") {
@@ -33,18 +73,19 @@ export default function ProductsPage() {
       list = list.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          p.botanicalName.toLowerCase().includes(q) ||
+          p.botanicalName?.toLowerCase().includes(q) ||
           p.description.toLowerCase().includes(q) ||
-          p.tags.some((t) => t.toLowerCase().includes(q))
+          (p.tags && p.tags.some((t) => t.toLowerCase().includes(q))) ||
+          p.category.toLowerCase().includes(q)
       );
     }
 
     if (sortBy === "price-low") list.sort((a, b) => a.price - b.price);
     if (sortBy === "price-high") list.sort((a, b) => b.price - a.price);
-    if (sortBy === "rating") list.sort((a, b) => b.rating - a.rating);
+    if (sortBy === "rating") list.sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
     return list;
-  }, [searchQuery, selectedCategory, selectedDifficulty, petFriendlyOnly, sortBy]);
+  }, [products, searchQuery, selectedCategory, selectedDifficulty, petFriendlyOnly, sortBy]);
 
   return (
     <div className="bg-offwhite min-h-screen py-12 sm:py-16">
@@ -76,10 +117,17 @@ export default function ProductsPage() {
           sortBy={sortBy}
           onSortChange={setSortBy}
           totalCount={filteredProducts.length}
+          availableCategories={allCategoryNames}
         />
 
         {/* Product Grid */}
-        {filteredProducts.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 animate-pulse">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="aspect-[4/5] bg-cream rounded-2xl" />
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="py-20 text-center bg-cream/40 rounded-3xl border border-sage/30 p-8">
             <p className="font-serif text-2xl font-bold text-forest mb-2">
               No botanical companions found
@@ -100,13 +148,9 @@ export default function ProductsPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
-            {filteredProducts.map((product, idx) => (
-              <PlantCard
-                key={product.slug}
-                product={product}
-                priority={idx < 4}
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {filteredProducts.map((product) => (
+              <PlantCard key={product.slug} product={product} />
             ))}
           </div>
         )}
@@ -114,4 +158,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-

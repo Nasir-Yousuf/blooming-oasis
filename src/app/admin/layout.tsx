@@ -13,6 +13,7 @@ import {
   Tag,
   MessageSquare,
   Settings,
+  Bot,
   LogOut,
   ExternalLink,
   Menu,
@@ -52,21 +53,17 @@ export default function AdminLayout({
       const res = await fetch("/api/auth/me");
       const data = await res.json();
       if (data.authenticated && data.user) {
+        const adminRoles = ["superadmin", "admin", "product_manager", "order_manager"];
+        if (!adminRoles.includes(data.user.role)) {
+          router.push("/admin/login?error=unauthorized");
+          return;
+        }
         setCurrentUser(data.user);
       } else {
-        // Dev convenience: set default admin if not logged in
-        setCurrentUser({
-          name: "Master Botanist Admin",
-          email: "admin@bloomingoasis.demo",
-          role: "superadmin",
-        });
+        router.push("/admin/login");
       }
     } catch {
-      setCurrentUser({
-        name: "Admin Specialist",
-        email: "admin@bloomingoasis.demo",
-        role: "superadmin",
-      });
+      router.push("/admin/login");
     }
   };
 
@@ -93,6 +90,7 @@ export default function AdminLayout({
     { name: "Inventory", href: "/admin/inventory", icon: Boxes },
     { name: "Promotions", href: "/admin/promotions", icon: Tag },
     { name: "Plant Tips", href: "/admin/plant-tips", icon: MessageSquare },
+    { name: "AI Specialist", href: "/admin/ai-assistant", icon: Bot },
     { name: "Store Settings", href: "/admin/settings", icon: Settings },
   ];
 

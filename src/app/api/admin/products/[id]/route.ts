@@ -1,26 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Product } from "@/models/Product";
+import { getUserFromRequest, canManageProducts } from "@/lib/auth";
+import { updateDynamicProduct } from "@/lib/gemini";
+import { revalidateStoreCatalog } from "@/lib/data-access";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const db = await connectToDatabase();
-
-    if (db) {
-      const product = await Product.findById(id).lean();
-      if (product) {
-        return NextResponse.json({ success: true, product });
-      }
+    const authUser = getUserFromRequest(req);
+    if (!canManageProducts(authUser?.role)) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Admin privileges required." },
+        { status: 403 }
+      );
     }
 
-    return NextResponse.json(
-      { success: false, message: "Product not found" },
-      { status: 404 }
-    );
+    const { id } = await params;
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable" },
+        { status: 503 }
+      );
+    }
+
+    const product = await Product.findById(id).lean();
+    if (!product) {
+      return NextResponse.json(
+        { success: false, message: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, product });
   } catch (error) {
     console.error("Product lookup error:", error);
     return NextResponse.json(
@@ -35,34 +50,44 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authUser = getUserFromRequest(req);
+    if (!canManageProducts(authUser?.role)) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Admin privileges required." },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const body = await req.json();
 
     const db = await connectToDatabase();
-    if (db) {
-      const updated = await Product.findByIdAndUpdate(id, body, {
-        new: true,
-        runValidators: true,
-      });
-
-      if (!updated) {
-        return NextResponse.json(
-          { success: false, message: "Product not found" },
-          { status: 404 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        product: updated,
-        message: "Product updated successfully",
-      });
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable" },
+        { status: 503 }
+      );
     }
+
+    const updated = await Product.findByIdAndUpdate(id, body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updated) {
+      return NextResponse.json(
+        { success: false, message: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    updateDynamicProduct(updated.slug, body);
+    revalidateStoreCatalog();
 
     return NextResponse.json({
       success: true,
-      product: { ...body, _id: id },
-      message: "Product updated (Demo Mode)",
+      product: updated,
+      message: "Product updated successfully",
     });
   } catch (error) {
     console.error("Product update error:", error);
@@ -78,26 +103,37 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authUser = getUserFromRequest(req);
+    if (!canManageProducts(authUser?.role)) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Admin privileges required." },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const db = await connectToDatabase();
-
-    if (db) {
-      const deleted = await Product.findByIdAndDelete(id);
-      if (!deleted) {
-        return NextResponse.json(
-          { success: false, message: "Product not found" },
-          { status: 404 }
-        );
-      }
-      return NextResponse.json({
-        success: true,
-        message: "Product deleted safely",
-      });
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable" },
+        { status: 503 }
+      );
     }
+
+    const deleted = await Product.findByIdAndDelete(id);
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, message: "Product not found" },
+        { status: 404 }
+      );
+    }
+
+    updateDynamicProduct(deleted.slug, { published: false, stock: 0 });
+    revalidateStoreCatalog();
 
     return NextResponse.json({
       success: true,
-      message: "Product deleted (Demo Mode)",
+      message: "Product deleted safely",
     });
   } catch (error) {
     console.error("Product delete error:", error);
@@ -107,4 +143,3 @@ export async function DELETE(
     );
   }
 }
-

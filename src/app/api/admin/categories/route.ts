@@ -2,43 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
-import { INITIAL_CATEGORIES } from "@/data/initialData";
+import { getUserFromRequest, hasAdminAccess } from "@/lib/auth";
+import { revalidateStoreCatalog } from "@/lib/data-access";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const db = await connectToDatabase();
-
-    if (db) {
-      const count = await Category.countDocuments();
-      if (count === 0) {
-        await Category.insertMany(INITIAL_CATEGORIES);
-      }
-
-      const categories = await Category.find().sort({ displayOrder: 1 }).lean();
-
-      // Aggregate product counts per category
-      const categoriesWithCount = await Promise.all(
-        categories.map(async (cat) => {
-          const productCount = await Product.countDocuments({
-            category: cat.name,
-          });
-          return { ...cat, productCount };
-        })
+    const authUser = getUserFromRequest(req);
+    if (!hasAdminAccess(authUser?.role)) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Admin privileges required." },
+        { status: 403 }
       );
-
-      return NextResponse.json({
-        success: true,
-        categories: categoriesWithCount,
-      });
     }
+
+    const db = await connectToDatabase();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable" },
+        { status: 503 }
+      );
+    }
+
+    const categories = await Category.find().sort({ displayOrder: 1, name: 1 }).lean();
+
+    const categoriesWithCount = await Promise.all(
+      categories.map(async (cat) => {
+        const productCount = await Product.countDocuments({
+          category: cat.name,
+        });
+        return { ...cat, productCount };
+      })
+    );
 
     return NextResponse.json({
       success: true,
-      categories: INITIAL_CATEGORIES.map((c, i) => ({
-        ...c,
-        _id: `cat-${i}`,
-        productCount: 2,
-      })),
+      categories: categoriesWithCount,
     });
   } catch (error) {
     console.error("Categories GET error:", error);
@@ -51,6 +49,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const authUser = getUserFromRequest(req);
+    if (!hasAdminAccess(authUser?.role)) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized. Admin privileges required." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     if (!body.name) {
       return NextResponse.json(
@@ -67,34 +73,35 @@ export async function POST(req: NextRequest) {
         .replace(/^-|-$/g, "");
 
     const db = await connectToDatabase();
-    if (db) {
-      const existing = await Category.findOne({ slug });
-      if (existing) {
-        return NextResponse.json(
-          { success: false, message: "Category slug already exists" },
-          { status: 409 }
-        );
-      }
-
-      const created = await Category.create({
-        ...body,
-        slug,
-        image:
-          body.image ||
-          "https://images.unsplash.com/photo-1614594975525-e45190c55d0b?auto=format&fit=crop&w=600&q=80",
-      });
-
-      return NextResponse.json({
-        success: true,
-        category: created,
-        message: "Category created successfully",
-      });
+    if (!db) {
+      return NextResponse.json(
+        { success: false, message: "Database connection unavailable" },
+        { status: 503 }
+      );
     }
+
+    const existing = await Category.findOne({ slug });
+    if (existing) {
+      return NextResponse.json(
+        { success: false, message: "Category slug already exists" },
+        { status: 409 }
+      );
+    }
+
+    const created = await Category.create({
+      ...body,
+      slug,
+      image:
+        body.image ||
+        "https://images.unsplash.com/photo-1614594975525-e45190c55d0b?auto=format&fit=crop&w=600&q=80",
+    });
+
+    revalidateStoreCatalog();
 
     return NextResponse.json({
       success: true,
-      category: { ...body, slug, _id: `local-cat-${Date.now()}` },
-      message: "Category created (Demo Mode)",
+      category: created,
+      message: "Category created successfully",
     });
   } catch (error) {
     console.error("Category creation error:", error);
@@ -104,4 +111,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

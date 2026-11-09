@@ -2,18 +2,16 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { CURATED_COLLECTIONS, INITIAL_PRODUCTS } from "@/data/initialProducts";
+import { CURATED_COLLECTIONS } from "@/data/initialProducts";
 import { PlantCard } from "@/components/shared/PlantCard";
 import { ArrowLeft, Sparkles } from "lucide-react";
+import { getDbProducts } from "@/lib/data-access";
+
+// Dynamic page so admin additions reflect immediately
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  return CURATED_COLLECTIONS.map((c) => ({
-    slug: c.slug,
-  }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -35,7 +33,13 @@ export default async function CollectionDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const matchingPlants = INITIAL_PRODUCTS.filter(collection.filterRule);
+  let matchingPlants: any[] = [];
+  try {
+    const liveProducts = await getDbProducts({ published: true });
+    matchingPlants = liveProducts.filter((p) => collection.filterRule(p as any));
+  } catch (err) {
+    console.error("Failed to load collection products from DB:", err);
+  }
 
   return (
     <div className="bg-offwhite min-h-screen py-12 sm:py-16">
@@ -90,42 +94,49 @@ export default async function CollectionDetailPage({ params }: PageProps) {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {matchingPlants.map((plant) => (
-              <PlantCard key={plant.slug} product={plant} />
-            ))}
-          </div>
+          {matchingPlants.length === 0 ? (
+            <div className="py-16 text-center text-charcoal/70 bg-cream/40 rounded-3xl border border-sage/30 p-8">
+              No houseplants currently match this collection in the live nursery catalog.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+              {matchingPlants.map((plant) => (
+                <PlantCard key={plant.slug} product={plant} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Other Curated Collections Navigation */}
-        <div className="pt-12 border-t border-sage/20">
+        <div className="border-t border-sage/20 pt-12">
           <h3 className="font-serif text-xl font-bold text-forest mb-6">
             Explore Other Themed Edits
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {CURATED_COLLECTIONS.filter((c) => c.slug !== slug).map((c) => (
-              <Link
-                key={c.slug}
-                href={`/collections/${c.slug}`}
-                className="p-5 rounded-2xl bg-cream/60 hover:bg-cream border border-sage/30 hover:border-forest transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-botanical block mb-1">
-                    {c.subtitle}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {CURATED_COLLECTIONS.filter((c) => c.slug !== slug)
+              .slice(0, 4)
+              .map((c) => (
+                <Link
+                  key={c.slug}
+                  href={`/collections/${c.slug}`}
+                  className="p-4 rounded-2xl bg-cream hover:bg-sage/20 transition-all border border-sage/30 flex flex-col justify-between group"
+                >
+                  <div>
+                    <span className="text-[10px] font-semibold text-botanical uppercase tracking-wider block mb-1">
+                      {c.subtitle}
+                    </span>
+                    <h4 className="font-serif font-bold text-forest group-hover:text-botanical transition-colors">
+                      {c.title}
+                    </h4>
+                  </div>
+                  <span className="text-xs text-forest/70 mt-3 font-medium">
+                    View Edit →
                   </span>
-                  <h4 className="font-serif font-bold text-forest text-base">
-                    {c.title}
-                  </h4>
-                </div>
-                <span className="text-xs font-semibold text-botanical mt-4 block">
-                  View Edit →
-                </span>
-              </Link>
-            ))}
+                </Link>
+              ))}
           </div>
         </div>
       </div>
     </div>
   );
 }
-

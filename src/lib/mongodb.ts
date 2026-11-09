@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -20,24 +18,28 @@ if (!cached) {
   cached = globalThis.mongooseCache = { conn: null, promise: null };
 }
 
+export function getMongoUri(): string | undefined {
+  return process.env.MONGODB_URI;
+}
+
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
-  if (!MONGODB_URI) {
-    // Graceful indicator when credentials haven't been provided yet
+  const uri = getMongoUri();
+  if (!uri) {
     return null;
   }
 
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    const opts = {
+    const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
+    cached.promise = mongoose.connect(uri, opts).then((mongooseInstance) => {
       return mongooseInstance;
     });
   }
@@ -47,12 +49,12 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
     return cached.conn;
   } catch (error) {
     cached.promise = null;
+    cached.conn = null;
     console.error("MongoDB connection failed:", error);
     return null;
   }
 }
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.MONGODB_URI);
+  return Boolean(getMongoUri());
 }
-

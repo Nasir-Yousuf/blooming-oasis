@@ -13,10 +13,18 @@ import {
   Sparkles,
   User,
   Shield,
+  Layers,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { SearchModal } from "@/components/shared/SearchModal";
 import { CURATED_COLLECTIONS } from "@/data/initialProducts";
+
+interface NavCategory {
+  _id: string;
+  name: string;
+  slug: string;
+  productCount?: number;
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -25,6 +33,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [categories, setCategories] = useState<NavCategory[]>([]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,10 +44,27 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Fetch dynamic categories for navigation
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        const json = await res.json();
+        if (json.success && Array.isArray(json.categories)) {
+          setCategories(json.categories);
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic navigation categories:", err);
+      }
+    }
+    loadCategories();
+  }, []);
+
   // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
     setCollectionsOpen(false);
+    setCategoriesOpen(false);
   }, [pathname]);
 
   const navLinks = [
@@ -106,18 +133,76 @@ export function Navbar() {
                 </Link>
               ))}
 
+              {/* Dynamic Categories Dropdown */}
+              <div className="relative group">
+                <button
+                  onClick={() => {
+                    setCategoriesOpen(!categoriesOpen);
+                    setCollectionsOpen(false);
+                  }}
+                  onMouseEnter={() => {
+                    setCategoriesOpen(true);
+                    setCollectionsOpen(false);
+                  }}
+                  className="flex items-center gap-1 text-sm tracking-wide font-medium text-charcoal/80 hover:text-forest py-1"
+                >
+                  <span>Categories</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-sage group-hover:rotate-180 transition-transform duration-300" />
+                </button>
+
+                <div
+                  onMouseLeave={() => setCategoriesOpen(false)}
+                  className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-offwhite rounded-2xl shadow-xl border border-sage/30 p-3 transition-all duration-300 z-50 ${
+                    categoriesOpen
+                      ? "opacity-100 visible translate-y-0"
+                      : "opacity-0 invisible -translate-y-2 pointer-events-none"
+                  }`}
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-botanical px-3 py-1 flex items-center gap-1">
+                    <Layers className="w-3 h-3" /> Live Classifications
+                  </div>
+                  {categories.map((cat) => (
+                    <Link
+                      key={cat._id}
+                      href={`/products?category=${encodeURIComponent(cat.name)}`}
+                      className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-cream transition-colors text-xs font-semibold text-forest"
+                    >
+                      <span>{cat.name}</span>
+                      {typeof cat.productCount === "number" && (
+                        <span className="text-[10px] text-charcoal/50 font-mono">
+                          {cat.productCount}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                  <div className="pt-2 mt-1 border-t border-sage/20 text-center">
+                    <Link
+                      href="/products"
+                      className="text-[11px] font-semibold uppercase tracking-wider text-botanical hover:text-forest"
+                    >
+                      All Indoor Plants →
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
               {/* Curated Collections Dropdown */}
               <div className="relative group">
                 <button
-                  onClick={() => setCollectionsOpen(!collectionsOpen)}
-                  onMouseEnter={() => setCollectionsOpen(true)}
+                  onClick={() => {
+                    setCollectionsOpen(!collectionsOpen);
+                    setCategoriesOpen(false);
+                  }}
+                  onMouseEnter={() => {
+                    setCollectionsOpen(true);
+                    setCategoriesOpen(false);
+                  }}
                   className="flex items-center gap-1 text-sm tracking-wide font-medium text-charcoal/80 hover:text-forest py-1"
                 >
                   <span>Collections</span>
                   <ChevronDown className="w-3.5 h-3.5 text-sage group-hover:rotate-180 transition-transform duration-300" />
                 </button>
 
-                {/* Dropdown Menu */}
                 <div
                   onMouseLeave={() => setCollectionsOpen(false)}
                   className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-offwhite rounded-2xl shadow-xl border border-sage/30 p-3 transition-all duration-300 z-50 ${
@@ -198,7 +283,7 @@ export function Navbar() {
                 className="hidden xl:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-cream hover:bg-sage/20 border border-sage/40 text-xs font-semibold text-forest uppercase tracking-wider transition-all"
               >
                 <Sparkles className="w-3.5 h-3.5 text-botanical" />
-                Matchmaker
+                <span>Matchmaker</span>
               </Link>
             </div>
           </div>
@@ -220,6 +305,26 @@ export function Navbar() {
                 {link.name}
               </Link>
             ))}
+
+            {/* Mobile Categories */}
+            {categories.length > 0 && (
+              <div className="pt-2 border-t border-sage/20">
+                <span className="px-3 text-xs font-semibold text-botanical uppercase tracking-wider block mb-1">
+                  Plant Categories
+                </span>
+                <div className="grid grid-cols-2 gap-1 px-1">
+                  {categories.map((cat) => (
+                    <Link
+                      key={cat._id}
+                      href={`/products?category=${encodeURIComponent(cat.name)}`}
+                      className="px-2 py-1.5 rounded-lg text-xs font-medium text-charcoal/80 hover:bg-cream hover:text-forest truncate"
+                    >
+                      {cat.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-sage/20">
               <span className="px-3 text-xs font-semibold text-botanical uppercase tracking-wider block mb-1">

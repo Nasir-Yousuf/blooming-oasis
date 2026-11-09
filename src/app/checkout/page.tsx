@@ -44,9 +44,56 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
 
-  // Calculate pricing
+  const [deliverySettings, setDeliverySettings] = useState({
+    freeThreshold: 75,
+    deliveryFee: 12,
+  });
+
+  React.useEffect(() => {
+    async function loadInitialData() {
+      try {
+        const [settingsRes, userRes] = await Promise.all([
+          fetch("/api/settings"),
+          fetch("/api/auth/me"),
+        ]);
+        const settingsData = await settingsRes.json();
+        const userData = await userRes.json();
+
+        if (settingsData.success && settingsData.settings) {
+          setDeliverySettings({
+            freeThreshold: settingsData.settings.freeDeliveryThreshold ?? 75,
+            deliveryFee: settingsData.settings.deliveryCharge ?? 12,
+          });
+        }
+
+        if (userData.authenticated && userData.user) {
+          setCustomer((prev) => ({
+            name: prev.name || userData.user.name || "",
+            email: prev.email || userData.user.email || "",
+            phone: prev.phone || userData.user.phone || "",
+          }));
+
+          const defaultAddr = userData.user.addresses?.find((a: any) => a.isDefault) || userData.user.addresses?.[0];
+          if (defaultAddr) {
+            setShippingAddress((prev) => ({
+              street: prev.street || defaultAddr.street || "",
+              city: prev.city || defaultAddr.city || "",
+              state: prev.state || defaultAddr.state || "",
+              postalCode: prev.postalCode || defaultAddr.postalCode || "",
+              country: prev.country || defaultAddr.country || "United States",
+            }));
+          }
+        }
+      } catch (err) {
+        console.warn("Checkout initialization error:", err);
+      }
+    }
+    loadInitialData();
+  }, []);
+
+  // Calculate pricing dynamically
   const discountAmount = appliedCoupon ? appliedCoupon.discount : 0;
-  const deliveryCharge = subtotal >= 75 ? 0 : 12;
+  const deliveryCharge = subtotal >= deliverySettings.freeThreshold ? 0 : deliverySettings.deliveryFee;
   const finalTotal = Math.max(0, subtotal - discountAmount + deliveryCharge);
 
   const handleApplyCoupon = async (e: React.FormEvent) => {

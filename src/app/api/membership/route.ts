@@ -21,33 +21,28 @@ export async function POST(req: NextRequest) {
 
     const { email, name } = parsed.data;
     const db = await connectToDatabase();
-
-    if (db) {
-      // Upsert membership
-      await Membership.findOneAndUpdate(
-        { email: email.toLowerCase() },
-        { email: email.toLowerCase(), name, active: true },
-        { upsert: true, new: true }
+    if (!db) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Membership enrollment is temporarily unavailable. Please try again shortly.",
+        },
+        { status: 503 }
       );
-
-      return NextResponse.json({
-        success: true,
-        persisted: true,
-        message:
-          "Welcome to Blooming Oasis Circle! Your member welcome guide and exclusive discount code are on their way.",
-      });
     }
 
-    console.log(
-      "[Advisory] Membership subscription validated (MongoDB Atlas pending):",
-      { email, name }
+    // Upsert membership
+    await Membership.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { email: email.toLowerCase(), name, active: true },
+      { upsert: true, new: true }
     );
 
     return NextResponse.json({
       success: true,
-      persisted: false,
+      persisted: true,
       message:
-        "Welcome to Blooming Oasis Circle! Your member perks have been activated.",
+        "Welcome to Blooming Oasis Circle! Your member welcome guide and exclusive discount code are on their way.",
     });
   } catch (error) {
     console.error("Membership API error:", error);
@@ -57,4 +52,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

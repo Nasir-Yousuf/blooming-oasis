@@ -1,28 +1,56 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { INITIAL_PRODUCTS, ProductData } from "@/data/initialProducts";
+import { ProductData } from "@/data/initialProducts";
 import { PlantCard } from "@/components/shared/PlantCard";
 
-export function PopularPlants() {
+interface PopularPlantsProps {
+  initialProducts?: ProductData[];
+}
+
+export function PopularPlants({ initialProducts = [] }: PopularPlantsProps) {
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [products, setProducts] = useState<ProductData[]>(initialProducts);
+  const [loading, setLoading] = useState(initialProducts.length === 0);
+
+  useEffect(() => {
+    // Client-side fetch to ensure fresh synchronization
+    async function loadFresh() {
+      try {
+        const res = await fetch("/api/products");
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setProducts(json.data);
+        }
+      } catch (err) {
+        console.warn("Could not fetch fresh popular products:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadFresh();
+  }, []);
 
   const filterProducts = (): ProductData[] => {
     switch (activeTab) {
       case "low-light":
-        return INITIAL_PRODUCTS.filter(
-          (p) => p.sunlight === "Low light" || p.sunlight === "Indirect sunlight"
+        return products.filter(
+          (p) =>
+            p.sunlight?.toLowerCase().includes("low") ||
+            p.sunlight?.toLowerCase().includes("indirect")
         );
       case "pet-friendly":
-        return INITIAL_PRODUCTS.filter((p) => p.petFriendly === true);
+        return products.filter((p) => p.petFriendly === true);
       case "statement":
-        return INITIAL_PRODUCTS.filter(
-          (p) => p.tags.includes("statement") || p.price >= 65
+        return products.filter(
+          (p) =>
+            (p.tags && p.tags.some((t) => t.toLowerCase().includes("statement"))) ||
+            p.price >= 65
         );
       default:
-        return INITIAL_PRODUCTS.slice(0, 8);
+        return products.slice(0, 8);
     }
   };
 
@@ -66,12 +94,24 @@ export function PopularPlants() {
           </div>
         </div>
 
-        {/* 8-Card Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-          {displayed.slice(0, 8).map((product, index) => (
-            <PlantCard key={product.slug} product={product} priority={index < 4} />
-          ))}
-        </div>
+        {/* Product Grid */}
+        {loading && products.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="aspect-[4/5] bg-cream rounded-2xl" />
+            ))}
+          </div>
+        ) : displayed.length === 0 ? (
+          <div className="py-12 text-center text-charcoal/70 bg-cream/40 rounded-2xl">
+            No houseplants match this filter in the current catalog.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {displayed.slice(0, 8).map((product, index) => (
+              <PlantCard key={product.slug} product={product} priority={index < 4} />
+            ))}
+          </div>
+        )}
 
         {/* Bottom CTA */}
         <div className="mt-14 text-center">
@@ -79,7 +119,7 @@ export function PopularPlants() {
             href="/products"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl bg-forest hover:bg-forest-light text-offwhite text-xs font-semibold uppercase tracking-wider shadow-card hover:shadow-elevated transition-all"
           >
-            Explore Complete 12+ Botanical Catalog
+            Explore Complete Botanical Catalog
             <ArrowRight className="w-4 h-4 text-sage" />
           </Link>
         </div>
@@ -87,4 +127,3 @@ export function PopularPlants() {
     </section>
   );
 }
-

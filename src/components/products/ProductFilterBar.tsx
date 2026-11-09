@@ -15,9 +15,10 @@ interface ProductFilterBarProps {
   sortBy: string;
   onSortChange: (sort: string) => void;
   totalCount: number;
+  availableCategories?: string[];
 }
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "All",
   "Tropical",
   "Foliage",
@@ -41,7 +42,17 @@ export function ProductFilterBar({
   sortBy,
   onSortChange,
   totalCount,
+  availableCategories,
 }: ProductFilterBarProps) {
+  // Use dynamically provided categories from MongoDB if available, ensuring "All" is first
+  const categoriesList = React.useMemo(() => {
+    if (availableCategories && availableCategories.length > 0) {
+      const distinct = Array.from(new Set(["All", ...availableCategories]));
+      return distinct;
+    }
+    return DEFAULT_CATEGORIES;
+  }, [availableCategories]);
+
   return (
     <div className="bg-offwhite rounded-3xl p-6 sm:p-8 border border-sage/30 shadow-soft mb-10 space-y-6">
       {/* Top Search & Results Counter */}
@@ -85,12 +96,12 @@ export function ProductFilterBar({
           Botanical Classification
         </span>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => (
+          {categoriesList.map((cat) => (
             <button
               key={cat}
               onClick={() => onCategoryChange(cat)}
               className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
-                selectedCategory === cat
+                selectedCategory.toLowerCase() === cat.toLowerCase()
                   ? "bg-forest text-offwhite shadow-sm"
                   : "bg-cream hover:bg-sage/20 text-charcoal/80"
               }`}
@@ -101,43 +112,43 @@ export function ProductFilterBar({
         </div>
       </div>
 
-      {/* Care Level & Pet Safety Toggles */}
-      <div className="pt-4 border-t border-sage/20 flex flex-wrap items-center justify-between gap-4">
-        {/* Difficulty level */}
+      {/* Difficulty & Pet-Friendly Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-sage/20 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-charcoal/80 mr-1">
-            Care Level:
+          <span className="font-semibold text-forest uppercase tracking-wider text-[11px]">
+            Care Difficulty:
           </span>
-          {DIFFICULTIES.map((diff) => (
-            <button
-              key={diff}
-              onClick={() => onDifficultyChange(diff)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                selectedDifficulty === diff
-                  ? "bg-sage text-forest font-semibold"
-                  : "bg-cream/60 hover:bg-cream text-charcoal/70"
-              }`}
-            >
-              {diff}
-            </button>
-          ))}
+          <div className="flex items-center gap-1.5">
+            {DIFFICULTIES.map((diff) => (
+              <button
+                key={diff}
+                onClick={() => onDifficultyChange(diff)}
+                className={`px-3 py-1 rounded-lg transition-colors ${
+                  selectedDifficulty === diff
+                    ? "bg-forest text-offwhite font-medium"
+                    : "bg-cream hover:bg-sage/20 text-charcoal/70"
+                }`}
+              >
+                {diff}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Pet-friendly filter checkbox */}
-        <label className="inline-flex items-center gap-2.5 cursor-pointer select-none text-xs text-charcoal/90 font-medium bg-cream/70 hover:bg-cream px-3.5 py-1.5 rounded-xl border border-sage/30 transition-colors">
+        {/* Pet Friendly Toggle Button */}
+        <label className="flex items-center gap-2.5 cursor-pointer group">
           <input
             type="checkbox"
             checked={petFriendlyOnly}
             onChange={(e) => onPetFriendlyChange(e.target.checked)}
-            className="w-4 h-4 rounded text-forest focus:ring-forest border-sage accent-forest"
+            className="w-4 h-4 rounded text-forest focus:ring-botanical accent-forest cursor-pointer"
           />
-          <span className="flex items-center gap-1">
+          <span className="text-xs font-medium text-forest group-hover:text-botanical transition-colors flex items-center gap-1">
             <Sparkles className="w-3.5 h-3.5 text-botanical" />
-            Pet-Safe Only (Non-Toxic)
+            100% Pet-Friendly Only (Non-Toxic)
           </span>
         </label>
       </div>
     </div>
   );
 }
-

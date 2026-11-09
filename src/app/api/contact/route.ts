@@ -24,58 +24,52 @@ export async function POST(req: NextRequest) {
 
     // 2. Connect to database
     const db = await connectToDatabase();
-
-    if (db) {
-      // 3. Prevent duplicate submissions: check if duplicate exists in the last 2 minutes
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
-      const duplicate = await ContactMessage.findOne({
-        email: email.toLowerCase(),
-        message: message,
-        createdAt: { $gte: twoMinutesAgo },
-      });
-
-      if (duplicate) {
-        return NextResponse.json(
-          {
-            success: false,
-            message:
-              "We have already received your message just a moment ago. Our plant care team is reviewing it!",
-            duplicate: true,
-          },
-          { status: 429 }
-        );
-      }
-
-      // 4. Save into MongoDB
-      const savedDoc = await ContactMessage.create({
-        name,
-        email: email.toLowerCase(),
-        subject,
-        category,
-        message,
-        status: "unread",
-      });
-
-      return NextResponse.json({
-        success: true,
-        persisted: true,
-        messageId: savedDoc._id,
-        message:
-          "Thank you! Your message has been safely received by our botanical specialists.",
-      });
+    if (!db) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Our messaging system is temporarily unavailable. Please try again shortly.",
+        },
+        { status: 503 }
+      );
     }
 
-    // Fallback when MongoDB is pending configuration:
-    console.log(
-      "[Advisory] Contact message validated (MongoDB Atlas credentials pending):",
-      { name, email, subject, category }
-    );
+    // 3. Prevent duplicate submissions: check if duplicate exists in the last 2 minutes
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const duplicate = await ContactMessage.findOne({
+      email: email.toLowerCase(),
+      message: message,
+      createdAt: { $gte: twoMinutesAgo },
+    });
+
+    if (duplicate) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "We have already received your message just a moment ago. Our plant care team is reviewing it!",
+          duplicate: true,
+        },
+        { status: 429 }
+      );
+    }
+
+    // 4. Save into MongoDB
+    const savedDoc = await ContactMessage.create({
+      name,
+      email: email.toLowerCase(),
+      subject,
+      category,
+      message,
+      status: "unread",
+    });
 
     return NextResponse.json({
       success: true,
-      persisted: false,
+      persisted: true,
+      messageId: savedDoc._id,
       message:
-        "Thank you! Your inquiry has been received and processed successfully.",
+        "Thank you! Your message has been safely received by our botanical specialists.",
     });
   } catch (error) {
     console.error("Contact API error:", error);
@@ -88,4 +82,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

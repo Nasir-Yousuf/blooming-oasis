@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Product } from "@/models/Product";
-import { INITIAL_PRODUCTS } from "@/data/initialProducts";
 
 export async function GET(
   req: NextRequest,
@@ -11,23 +10,15 @@ export async function GET(
     const { slug } = await params;
     const db = await connectToDatabase();
 
-    if (db) {
-      try {
-        const product = await Product.findOne({ slug }).lean();
-        if (product) {
-          return NextResponse.json({
-            success: true,
-            dataSource: "mongodb-atlas",
-            data: product,
-          });
-        }
-      } catch (e) {
-        console.warn("DB lookup error, falling back to static:", e);
-      }
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "Database connection unavailable" },
+        { status: 503 }
+      );
     }
 
-    const staticProduct = INITIAL_PRODUCTS.find((p) => p.slug === slug);
-    if (!staticProduct) {
+    const product = await Product.findOne({ slug, published: true }).lean();
+    if (!product) {
       return NextResponse.json(
         { success: false, error: "Product not found" },
         { status: 404 }
@@ -36,8 +27,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      dataSource: "local-fallback",
-      data: staticProduct,
+      data: product,
     });
   } catch (error) {
     console.error("Single product API error:", error);
@@ -47,4 +37,3 @@ export async function GET(
     );
   }
 }
-

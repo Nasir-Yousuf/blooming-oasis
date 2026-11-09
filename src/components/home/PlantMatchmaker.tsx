@@ -10,8 +10,12 @@ import {
   ArrowLeft,
   CheckCircle2,
 } from "lucide-react";
-import { INITIAL_PRODUCTS, ProductData } from "@/data/initialProducts";
+import { ProductData } from "@/data/initialProducts";
 import { triggerBotanicalConfetti, formatPrice } from "@/lib/browser-interactions";
+
+interface PlantMatchmakerProps {
+  initialProducts?: ProductData[];
+}
 
 interface QuizAnswers {
   sunlight: string;
@@ -26,7 +30,8 @@ interface MatchResult {
   reasons: string[];
 }
 
-export function PlantMatchmaker() {
+export function PlantMatchmaker({ initialProducts = [] }: PlantMatchmakerProps) {
+  const [catalog, setCatalog] = useState<ProductData[]>(initialProducts);
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswers>({
     sunlight: "",
@@ -35,6 +40,21 @@ export function PlantMatchmaker() {
     watering: "",
   });
   const [results, setResults] = useState<MatchResult[] | null>(null);
+
+  React.useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/products");
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setCatalog(json.data);
+        }
+      } catch (err) {
+        console.warn("Matchmaker catalog load error:", err);
+      }
+    }
+    loadCatalog();
+  }, []);
 
   const questions = [
     {
@@ -140,7 +160,7 @@ export function PlantMatchmaker() {
   };
 
   const calculateMatches = (finalAnswers: QuizAnswers) => {
-    const scored: MatchResult[] = INITIAL_PRODUCTS.map((plant) => {
+    const scored: MatchResult[] = catalog.map((plant) => {
       let score = 0;
       const reasons: string[] = [];
 

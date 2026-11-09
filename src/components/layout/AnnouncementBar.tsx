@@ -1,11 +1,36 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sparkles, X, ArrowRight } from "lucide-react";
 
 export function AnnouncementBar() {
   const [isVisible, setIsVisible] = useState(true);
+  const [announcementText, setAnnouncementText] = useState(
+    "Bring home a little more green. Free nationwide delivery on orders over $75."
+  );
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        const json = await res.json();
+        if (json.success && json.settings) {
+          if (json.settings.announcementActive === false) {
+            setIsVisible(false);
+          } else {
+            setIsVisible(true);
+            if (json.settings.announcementText) {
+              setAnnouncementText(json.settings.announcementText);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load announcement settings:", err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   if (!isVisible) return null;
 
@@ -15,10 +40,7 @@ export function AnnouncementBar() {
         <div className="flex-1 flex items-center justify-center gap-2 text-center">
           <Sparkles className="w-3.5 h-3.5 text-sage hidden sm:inline" />
           <span className="font-light tracking-wide text-cream/90">
-            Bring home a little more green.{" "}
-            <span className="font-medium text-offwhite">
-              Free nationwide delivery on orders over $75.
-            </span>
+            {announcementText}
           </span>
           <Link
             href="/products"
@@ -38,4 +60,3 @@ export function AnnouncementBar() {
     </div>
   );
 }
-

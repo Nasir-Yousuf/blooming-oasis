@@ -304,21 +304,30 @@ export function MonsteraDetail({ product }: MonsteraDetailProps) {
               </div>
 
               {/* Add to Cart CTA */}
-              <button
-                onClick={handleAddToCart}
-                className="flex-1 py-4 px-6 rounded-2xl bg-forest hover:bg-forest-light text-offwhite text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-card hover:shadow-elevated transition-all active:scale-95"
-              >
-                {isAddedNotice ? (
-                  <>
-                    <Check className="w-4 h-4 text-sage animate-bounce" /> Added to Cart!
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag className="w-4 h-4 text-sage" /> Add to Botanical Cart (
-                    {formatPrice(lineTotal)})
-                  </>
-                )}
-              </button>
+              {product.stock <= 0 ? (
+                <button
+                  disabled
+                  className="flex-1 py-4 px-6 rounded-2xl bg-charcoal/20 text-charcoal/50 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed"
+                >
+                  Out of Stock
+                </button>
+              ) : (
+                <button
+                  onClick={handleAddToCart}
+                  className="flex-1 py-4 px-6 rounded-2xl bg-forest hover:bg-forest-light text-offwhite text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-card hover:shadow-elevated transition-all active:scale-95"
+                >
+                  {isAddedNotice ? (
+                    <>
+                      <Check className="w-4 h-4 text-sage animate-bounce" /> Added to Cart!
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-4 h-4 text-sage" /> Add to Botanical Cart (
+                      {formatPrice(lineTotal)})
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Delivery & Guarantee Badges */}

@@ -44,6 +44,7 @@ interface ProductItem {
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<ProductItem[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -83,6 +84,21 @@ export default function AdminProductsPage() {
   useEffect(() => {
     fetchProducts();
   }, [categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/admin/categories");
+        const data = await res.json();
+        if (data.success && Array.isArray(data.categories)) {
+          setCategories(data.categories);
+        }
+      } catch (err) {
+        console.warn("Could not load categories in admin products:", err);
+      }
+    }
+    loadCategories();
+  }, []);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -296,12 +312,11 @@ export default function AdminProductsPage() {
             className="bg-cream/70 border border-sage/40 rounded-xl px-3 py-2 text-xs text-charcoal font-medium focus:outline-none focus:border-botanical"
           >
             <option value="All">All Categories</option>
-            <option value="Tropical">Tropical</option>
-            <option value="Foliage">Foliage</option>
-            <option value="Trees">Trees</option>
-            <option value="Flowering">Flowering</option>
-            <option value="Ferns">Ferns</option>
-            <option value="Succulent">Succulent</option>
+            {categories.map((c) => (
+              <option key={c._id || c.name} value={c.name}>
+                {c.name}
+              </option>
+            ))}
           </select>
 
           {/* Status Filter */}
@@ -600,12 +615,22 @@ export default function AdminProductsPage() {
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     className="w-full bg-cream/60 border border-sage/40 rounded-xl px-2.5 py-2.5 text-xs text-charcoal focus:outline-none focus:border-botanical"
                   >
-                    <option value="Tropical">Tropical</option>
-                    <option value="Foliage">Foliage</option>
-                    <option value="Trees">Trees</option>
-                    <option value="Flowering">Flowering</option>
-                    <option value="Ferns">Ferns</option>
-                    <option value="Succulent">Succulent</option>
+                    {categories.length > 0 ? (
+                      categories.map((c) => (
+                        <option key={c._id || c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Tropical">Tropical</option>
+                        <option value="Foliage">Foliage</option>
+                        <option value="Trees">Trees</option>
+                        <option value="Flowering">Flowering</option>
+                        <option value="Ferns">Ferns</option>
+                        <option value="Succulent">Succulent</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

@@ -8,6 +8,9 @@ import { PlantCareGuides } from "@/components/home/PlantCareGuides";
 import { MembershipAccordion } from "@/components/home/MembershipAccordion";
 import { AboutPreview } from "@/components/home/AboutPreview";
 import { SocialSection } from "@/components/home/SocialSection";
+import { getDbProducts } from "@/lib/data-access";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Blooming Oasis | Premium Indoor Plants & Modern Botanical Living",
@@ -32,7 +35,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  let products: any[] = [];
+  try {
+    products = await getDbProducts({ published: true });
+  } catch (err) {
+    console.error("HomePage products load error:", err);
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. Hero Section */}
@@ -42,10 +52,10 @@ export default function HomePage() {
       <BotanicalCollage />
 
       {/* 3. Popular Houseplants Showcase */}
-      <PopularPlants />
+      <PopularPlants initialProducts={products as any} />
 
       {/* 4. Interactive Plant Matchmaker Quiz */}
-      <PlantMatchmaker />
+      <PlantMatchmaker initialProducts={products as any} />
 
       {/* 5. Curated Themed Collections */}
       <CuratedCollections />
@@ -53,7 +63,7 @@ export default function HomePage() {
       {/* 6. Magazine-Style Plant Care Guides */}
       <PlantCareGuides />
 
-      {/* 7. Collapsible "Grow With Us" Membership with Custom Unordered List */}
+      {/* 7. Collapsible "Grow With Us" Membership */}
       <MembershipAccordion />
 
       {/* 8. About Blooming Oasis Preview */}
