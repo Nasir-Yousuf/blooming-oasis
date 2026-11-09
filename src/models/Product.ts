@@ -18,11 +18,13 @@ export interface IProduct extends Document {
   name: string;
   slug: string;
   botanicalName?: string;
+  sku?: string;
   tagline: string;
   description: string;
   price: number;
+  discountPrice?: number;
   images: string[];
-  category: "Tropical" | "Succulent" | "Foliage" | "Flowering" | "Ferns" | "Trees";
+  category: string;
   sunlight: "Low light" | "Indirect sunlight" | "Bright indirect sunlight" | "Direct sunlight";
   watering: "Low maintenance" | "Weekly care" | "I enjoy regular plant care";
   humidity: "Normal (40-50%)" | "High (60%+)" | "Tolerates dry air";
@@ -35,6 +37,7 @@ export interface IProduct extends Document {
   accessories: IProductAccessory[];
   stock: number;
   featured: boolean;
+  published: boolean;
   rating: number;
   reviewsCount: number;
   tags: string[];
@@ -46,15 +49,17 @@ const ProductSchema = new Schema<IProduct>(
   {
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, index: true },
-    botanicalName: { type: String },
+    botanicalName: { type: String, default: "" },
+    sku: { type: String, default: "" },
     tagline: { type: String, default: "" },
     description: { type: String, required: true },
     price: { type: Number, required: true, min: 0 },
+    discountPrice: { type: Number, default: 0 },
     images: { type: [String], default: [] },
     category: {
       type: String,
       required: true,
-      enum: ["Tropical", "Succulent", "Foliage", "Flowering", "Ferns", "Trees"],
+      index: true,
     },
     sunlight: {
       type: String,
@@ -98,6 +103,7 @@ const ProductSchema = new Schema<IProduct>(
     ],
     stock: { type: Number, default: 20 },
     featured: { type: Boolean, default: false, index: true },
+    published: { type: Boolean, default: true, index: true },
     rating: { type: Number, default: 4.8 },
     reviewsCount: { type: Number, default: 24 },
     tags: { type: [String], default: [] },
@@ -109,4 +115,3 @@ const ProductSchema = new Schema<IProduct>(
 
 export const Product: Model<IProduct> =
   mongoose.models.Product || mongoose.model<IProduct>("Product", ProductSchema);
-

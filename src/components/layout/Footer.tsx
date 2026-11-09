@@ -130,8 +130,13 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/#plant-matchmaker" className="hover:text-sage transition-colors">
-                  Plant Matchmaker Quiz
+                <Link href="/account" className="hover:text-sage transition-colors">
+                  Customer Account & Orders
+                </Link>
+              </li>
+              <li>
+                <Link href="/admin" className="text-sage hover:text-offwhite transition-colors font-medium">
+                  Admin Dashboard →
                 </Link>
               </li>
             </ul>

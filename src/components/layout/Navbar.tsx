@@ -11,6 +11,8 @@ import {
   Sprout,
   ChevronDown,
   Sparkles,
+  User,
+  Shield,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { SearchModal } from "@/components/shared/SearchModal";
@@ -170,13 +172,33 @@ export function Navbar() {
                 )}
               </button>
 
-              {/* CTA Link to Matchmaker or Catalog */}
+              {/* Customer Account Button */}
+              <Link
+                href="/account"
+                className="p-2 sm:p-2.5 rounded-full hover:bg-cream text-forest transition-colors relative"
+                title="Customer Account & Orders"
+                aria-label="Customer Account & Orders"
+              >
+                <User className="w-5 h-5" />
+              </Link>
+
+              {/* Admin Dashboard Pill */}
+              <Link
+                href="/admin"
+                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-forest/5 hover:bg-forest/10 border border-forest/20 text-xs font-semibold text-forest transition-colors"
+                title="Administrative Control Center"
+              >
+                <Shield className="w-3.5 h-3.5 text-terracotta" />
+                <span>Admin</span>
+              </Link>
+
+              {/* CTA Link to Matchmaker */}
               <Link
                 href="/#plant-matchmaker"
-                className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-cream hover:bg-sage/20 border border-sage/40 text-xs font-semibold text-forest uppercase tracking-wider transition-all"
+                className="hidden xl:inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-cream hover:bg-sage/20 border border-sage/40 text-xs font-semibold text-forest uppercase tracking-wider transition-all"
               >
                 <Sparkles className="w-3.5 h-3.5 text-botanical" />
-                Plant Matchmaker
+                Matchmaker
               </Link>
             </div>
           </div>
@@ -214,6 +236,23 @@ export function Navbar() {
               ))}
             </div>
 
+            <div className="pt-2 border-t border-sage/20 space-y-2">
+              <Link
+                href="/account"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-forest hover:bg-cream"
+              >
+                <User className="w-4 h-4 text-botanical" />
+                <span>My Account & Orders</span>
+              </Link>
+              <Link
+                href="/admin"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-forest hover:bg-cream"
+              >
+                <Shield className="w-4 h-4 text-terracotta" />
+                <span>Admin Dashboard</span>
+              </Link>
+            </div>
+
             <div className="pt-2">
               <Link
                 href="/#plant-matchmaker"
@@ -231,4 +270,3 @@ export function Navbar() {
     </>
   );
 }
-
