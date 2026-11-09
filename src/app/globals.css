@@ -3,19 +3,33 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #FEFDF9;
+  --foreground: #252B27;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: #252B27;
+  background-color: #FEFDF9;
+  overflow-x: hidden;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove default focus ring on mouse click while preserving keyboard accessibility */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid #547B55;
+  outline-offset: 2px;
+}
+
+/* Selection Color */
+::selection {
+  background-color: #A8B99A;
+  color: #183D32;
 }

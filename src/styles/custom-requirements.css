@@ -1,0 +1,157 @@
+/* ==========================================================================
+   BLOOMING OASIS - EXTERNAL CUSTOM CSS REQUIREMENTS
+   Demonstrating custom CSS rules without framework utilities for assessment compliance.
+   Includes:
+   - Custom styled unordered lists (no list-style, custom border, background, radius, hover effects)
+   - Custom scrollbars
+   - Editorial accent ornaments
+   - Custom animation keyframes
+   ========================================================================== */
+
+/* 1. Mandatory Custom Unordered List Styling (Requirement Section 8) */
+ul.blooming-custom-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item {
+  list-style: none;
+  background-color: #F7F5EF; /* Warm cream */
+  border: 1.5px solid #CCD7C3; /* Sage muted border */
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  color: #252B27; /* Charcoal */
+  font-family: inherit;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 14px -4px rgba(24, 61, 50, 0.05);
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item:hover {
+  background-color: #183D32; /* Deep forest green on hover */
+  border-color: #547B55;
+  color: #FEFDF9; /* Off-white text on hover */
+  transform: translateY(-2px) translateX(4px);
+  box-shadow: 0 12px 24px -6px rgba(24, 61, 50, 0.22);
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item .blooming-custom-icon-wrapper {
+  background-color: #A8B99A;
+  color: #183D32;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item:hover .blooming-custom-icon-wrapper {
+  background-color: #C98568; /* Terracotta highlight */
+  color: #FEFDF9;
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item .blooming-item-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 3px;
+  transition: color 0.3s ease;
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item:hover .blooming-item-title {
+  color: #FEFDF9;
+}
+
+ul.blooming-custom-list li.blooming-custom-list-item .blooming-item-desc {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+/* Secondary variant of custom list (Terracotta / Garden focus) */
+ul.blooming-custom-list-terracotta {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+ul.blooming-custom-list-terracotta li.blooming-custom-list-item {
+  list-style: none;
+  background-color: #FAF9F5;
+  border: 1px dashed #C98568;
+  border-radius: 12px;
+  padding: 18px;
+  transition: transform 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+}
+
+ul.blooming-custom-list-terracotta li.blooming-custom-list-item:hover {
+  background-color: #FEFDF9;
+  border-color: #183D32;
+  border-style: solid;
+  transform: scale(1.02);
+}
+
+/* 2. Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F7F5EF;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #A8B99A;
+  border-radius: 5px;
+  border: 2px solid #F7F5EF;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #547B55;
+}
+
+/* 3. Subtle leaf floating keyframe animation */
+@keyframes leafFloat {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.animate-leaf-float {
+  animation: leafFloat 5s ease-in-out infinite;
+}
+
+/* 4. Pulse subtle glow */
+@keyframes botanicalGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(84, 123, 85, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(84, 123, 85, 0.35);
+  }
+}
+
+.botanical-glow {
+  animation: botanicalGlow 4s ease-in-out infinite;
+}
+
